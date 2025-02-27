@@ -1,0 +1,268 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Crown Placement Game</title>
+    <style>
+        .container {
+            text-align: center;
+            font-family: Arial, sans-serif;
+        }
+        .board {
+            display: grid;
+            gap: 2px;
+            margin: 20px auto;
+            background: #333;
+            padding: 2px;
+            border-radius: 5px;
+        }
+        .cell {
+            width: 30px;
+            height: 30px;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            cursor: pointer;
+            border: 1px solid #ccc;
+        }
+        .cell.x {
+            background: #ffcccc;
+        }
+        .cell.crown {
+            background: #ccccff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div>
+            <select id="size">
+                <option value="4">4x4</option>
+                <option value="5">5x5</option>
+                <option value="6">6x6</option>
+                <option value="7">7x7</option>
+                <option value="8">8x8</option>
+            </select>
+            <select id="colorCount">
+                <option value="2">2 Colors</option>
+                <option value="3">3 Colors</option>
+                <option value="4">4 Colors</option>
+                <option value="5">5 Colors</option>
+            </select>
+            <button onclick="generateBoard()">Start</button>
+        </div>
+        <div id="board" class="board"></div>
+    </div>
+
+    <script>
+        let boardSize = 4;
+        let colorCount = 2;
+        let board = [];
+        let crowns = [];
+        let xMarks = new Set();
+        let colors = {};
+
+        function generateBoard() {
+            boardSize = parseInt(document.getElementById('size').value);
+            colorCount = parseInt(document.getElementById('colorCount').value);
+            crowns = [];
+            xMarks.clear();
+            
+            // Generate random connected color regions
+            const colorGrid = Array.from({length: boardSize}, () => 
+                Array(boardSize).fill(null));
+            
+            // First pass: Assign colors ensuring connected regions
+            let currentColor = 0;
+            for (let i = 0; i < boardSize; i++) {
+                for (let j = 0; j < boardSize; j++) {
+                    if (colorGrid[i][j] === null) {
+                        if (currentColor < colorCount) {
+                            floodFill(i, j, currentColor, colorGrid);
+                            currentColor++;
+                        } else {
+                            // Fill with random existing color
+                            const randomColor = Math.floor(Math.random() * colorCount);
+                            floodFill(i, j, randomColor, colorGrid);
+                        }
+                    }
+                }
+            }
+
+            // Ensure all colors are used
+            const usedColors = new Set(colorGrid.flat());
+            let missingColors = [];
+            
+            for (let c = 0; c < colorCount; c++) {
+                if (!usedColors.has(c)) {
+                    missingColors.push(c);
+                }
+            }
+
+            // If there are missing colors, reassign some regions
+            if (missingColors.length > 0) {
+                for (const missingColor of missingColors) {
+                    // Find a region that can be split
+                    for (let i = 0; i < boardSize; i++) {
+                        for (let j = 0; j < boardSize; j++) {
+                            if (colorGrid[i][j] !== missingColor) {
+                                // Try to create a new region for the missing color
+                                const newGrid = JSON.parse(JSON.stringify(colorGrid));
+                                newGrid[i][j] = missingColor;
+                                
+                                // Check if we can maintain connected regions
+                                if (canMaintainConnectedRegions(newGrid)) {
+                                    colorGrid = newGrid;
+                                    usedColors.add(missingColor);
+                                    break;
+                                }
+                            }
+                        }
+                        if (usedColors.has(missingColor)) break;
+                    }
+                }
+            }
+
+            // Create the board
+            const boardDiv = document.getElementById('board');
+            boardDiv.style.gridTemplateColumns = `repeat(${boardSize}, 30px)`;
+            boardDiv.innerHTML = '';
+            
+            for (let i = 0; i < boardSize; i++) {
+                for (let j = 0; j < boardSize; j++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.row = i;
+                    cell.dataset.col = j;
+                    cell.dataset.color = colorGrid[i][j];
+                    cell.onclick = () => handleCellClick(i, j);
+                    boardDiv.appendChild(cell);
+                }
+            }
+        }
+
+        function floodFill(x, y, color, grid) {
+            if (x < 0 || x >= boardSize || y < 0 || y >= boardSize || grid[x][y] !== null) return;
+            grid[x][y] = color;
+            
+            // Randomly choose directions to expand
+            const directions = [[-1,0], [1,0], [0,-1], [0,1]];
+            directions.sort(() => Math.random() - 0.5);
+            
+            directions.forEach(([dx, dy]) => {
+                floodFill(x + dx, y + dy, color, grid);
+            });
+        }
+
+        function canMaintainConnectedRegions(grid) {
+            // Check if all regions of the same color are connected
+            const visited = Array.from({length: boardSize}, () => Array(boardSize).fill(false));
+            
+            for (let c = 0; c < colorCount; c++) {
+                const positions = [];
+                for (let i = 0; i < boardSize; i++) {
+                    for (let j = 0; j < boardSize; j++) {
+                        if (grid[i][j] === c) {
+                            positions.push([i, j]);
+                        }
+                    }
+                }
+                
+                if (positions.length === 0) return false;
+                
+                const queue = [positions[0]];
+                visited[queue[0][0]][queue[0][1]] = true;
+                
+                while (queue.length > 0) {
+                    const [x, y] = queue.shift();
+                    
+                    [[-1,0], [1,0], [0,-1], [0,1]].forEach(([dx, dy]) => {
+                        const nx = x + dx;
+                        const ny = y + dy;
+                        
+                        if (nx >= 0 && nx < boardSize && ny >= 0 && ny < boardSize && 
+                            grid[nx][ny] === c && !visited[nx][ny]) {
+                            visited[nx][ny] = true;
+                            queue.push([nx, ny]);
+                        }
+                    });
+                }
+
+                // Check if all positions of this color were visited
+                for (const [i, j] of positions) {
+                    if (!visited[i][j]) return false;
+                }
+            }
+            
+            return true;
+        }
+
+        function handleCellClick(row, col) {
+            const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+            
+            if (cell.textContent === '♔') {
+                // Remove crown
+                crowns = crowns.filter(c => c.row !== row || c.col !== col);
+                cell.textContent = '';
+                cell.classList.remove('crown');
+                updateXMarks();
+            } else if (cell.textContent === '×') {
+                cell.textContent = '';
+                cell.classList.remove('x');
+                xMarks.delete(`${row},${col}`);
+            } else {
+                if (isValidCrownPosition(row, col)) {
+                    // Place crown
+                    crowns.push({row, col});
+                    cell.textContent = '♔';
+                    cell.classList.add('crown');
+                    updateXMarks();
+                } else {
+                    if (!xMarks.has(`${row},${col}`)) {
+                        cell.textContent = '×';
+                        cell.classList.add('x');
+                        xMarks.add(`${row},${col}`);
+                    } else {
+                        alert('Illegal move!');
+                    }
+                }
+            }
+        }
+
+        function isValidCrownPosition(row, col) {
+            return !crowns.some(c => c.row === row || c.col === col || 
+                document.querySelector(`[data-row="${c.row}"][data-col="${c.col}"]`).dataset.color ===
+                document.querySelector(`[data-row="${row}"][data-col="${col}"]`).dataset.color);
+        }
+
+        function updateXMarks() {
+            document.querySelectorAll('.cell').forEach(cell => {
+                const row = parseInt(cell.dataset.row);
+                const col = parseInt(cell.dataset.col);
+                
+                if (!cell.textContent) {
+                    const isInvalid = crowns.some(c => c.row === row || c.col === col ||
+                        cell.dataset.color === document.querySelector(`[data-row="${c.row}"][data-col="${c.col}"]`).dataset.color);
+                    
+                    if (isInvalid) {
+                        if (!xMarks.has(`${row},${col}`)) {
+                            cell.textContent = '×';
+                            cell.classList.add('x');
+                            xMarks.add(`${row},${col}`);
+                        }
+                    } else {
+                        cell.textContent = '';
+                        cell.classList.remove('x');
+                        xMarks.delete(`${row},${col}`);
+                    }
+                }
+            });
+        }
+
+        // Initialize the board
+        generateBoard();
+    </script>
+</body>
+</html>
