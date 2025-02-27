@@ -1,3 +1,19 @@
+<!--
+Rules:
+- exactly one piece in each row
+- exactly one piece in each col
+- exactly one piece in each color region
+- colored cells must be connected to each other
+- pieces cannot be adjacent to each other (side by side or diagonal)
+
+Pressing a cell once will mark it X to show it's eliminated, and pressing it once again will attempt to place a piece.
+
+You must also verify that the generated board satisfies the parameters specified by the user, and if it is not possible show an alert explaining why.
+
+If a piece is placed down, mark any cells that should be eliminated with an X, but these must be removed if that piece is removed. Do not remove
+manually placed pieces.
+-->
+
 
 <!DOCTYPE html>
 <html>
@@ -26,6 +42,7 @@
             font-size: 20px;
             cursor: pointer;
             border: 1px solid #ccc;
+            transition: all 0.3s ease;
         }
         .cell.x {
             background: #ffcccc;
@@ -65,145 +82,123 @@
         let colors = {};
 
         function generateBoard() {
-            boardSize = parseInt(document.getElementById('size').value);
-            colorCount = parseInt(document.getElementById('colorCount').value);
+            // Reset the board
             crowns = [];
             xMarks.clear();
-            
-            // Generate random connected color regions
-            const colorGrid = Array.from({length: boardSize}, () => 
-                Array(boardSize).fill(null));
-            
-            // First pass: Assign colors ensuring connected regions
-            let currentColor = 0;
-            for (let i = 0; i < boardSize; i++) {
-                for (let j = 0; j < boardSize; j++) {
-                    if (colorGrid[i][j] === null) {
-                        if (currentColor < colorCount) {
-                            floodFill(i, j, currentColor, colorGrid);
-                            currentColor++;
-                        } else {
-                            // Fill with random existing color
-                            const randomColor = Math.floor(Math.random() * colorCount);
-                            floodFill(i, j, randomColor, colorGrid);
-                        }
-                    }
-                }
-            }
-
-            // Ensure all colors are used
-            const usedColors = new Set(colorGrid.flat());
-            let missingColors = [];
-            
-            for (let c = 0; c < colorCount; c++) {
-                if (!usedColors.has(c)) {
-                    missingColors.push(c);
-                }
-            }
-
-            // If there are missing colors, reassign some regions
-            if (missingColors.length > 0) {
-                for (const missingColor of missingColors) {
-                    // Find a region that can be split
-                    for (let i = 0; i < boardSize; i++) {
-                        for (let j = 0; j < boardSize; j++) {
-                            if (colorGrid[i][j] !== missingColor) {
-                                // Try to create a new region for the missing color
-                                const newGrid = JSON.parse(JSON.stringify(colorGrid));
-                                newGrid[i][j] = missingColor;
-                                
-                                // Check if we can maintain connected regions
-                                if (canMaintainConnectedRegions(newGrid)) {
-                                    colorGrid = newGrid;
-                                    usedColors.add(missingColor);
-                                    break;
-                                }
-                            }
-                        }
-                        if (usedColors.has(missingColor)) break;
-                    }
-                }
-            }
-
-            // Create the board
             const boardDiv = document.getElementById('board');
-            boardDiv.style.gridTemplateColumns = `repeat(${boardSize}, 30px)`;
             boardDiv.innerHTML = '';
-            
-            for (let i = 0; i < boardSize; i++) {
-                for (let j = 0; j < boardSize; j++) {
-                    const cell = document.createElement('div');
-                    cell.className = 'cell';
-                    cell.dataset.row = i;
-                    cell.dataset.col = j;
-                    cell.dataset.color = colorGrid[i][j];
-                    cell.onclick = () => handleCellClick(i, j);
-                    boardDiv.appendChild(cell);
-                }
+
+            // Get parameters
+            boardSize = parseInt(document.getElementById('size').value);
+            colorCount = parseInt(document.getElementById('colorCount').value);
+
+            // Check if it's possible to create valid regions
+            if (colorCount > boardSize || (boardSize * boardSize) / colorCount < 4) {
+                alert('Impossible to create a valid board with the specified parameters.');
+                return;
             }
-        }
 
-        function floodFill(x, y, color, grid) {
-            if (x < 0 || x >= boardSize || y < 0 || y >= boardSize || grid[x][y] !== null) return;
-            grid[x][y] = color;
-            
-            // Randomly choose directions to expand
-            const directions = [[-1,0], [1,0], [0,-1], [0,1]];
-            directions.sort(() => Math.random() - 0.5);
-            
-            directions.forEach(([dx, dy]) => {
-                floodFill(x + dx, y + dy, color, grid);
-            });
-        }
+            // Create an empty grid
+            const colorGrid = Array.from({ length: boardSize }, () => 
+                Array(boardSize).fill(null));
 
-        function canMaintainConnectedRegions(grid) {
-            // Check if all regions of the same color are connected
-            const visited = Array.from({length: boardSize}, () => Array(boardSize).fill(false));
-            
+            // Calculate the size of each color region
+            const regionSize = Math.floor((boardSize * boardSize) / colorCount);
+            const remainingCells = (boardSize * boardSize) % colorCount;
+
+            // Assign starting positions for each color to ensure they're spread out
+            const startingPositions = [];
             for (let c = 0; c < colorCount; c++) {
-                const positions = [];
-                for (let i = 0; i < boardSize; i++) {
-                    for (let j = 0; j < boardSize; j++) {
-                        if (grid[i][j] === c) {
-                            positions.push([i, j]);
-                        }
-                    }
-                }
-                
-                if (positions.length === 0) return false;
-                
-                const queue = [positions[0]];
-                visited[queue[0][0]][queue[0][1]] = true;
-                
-                while (queue.length > 0) {
-                    const [x, y] = queue.shift();
-                    
-                    [[-1,0], [1,0], [0,-1], [0,1]].forEach(([dx, dy]) => {
+                const quadrant = Math.floor(c / (Math.ceil(colorCount / 2)));
+                const x = Math.floor((c % Math.ceil(colorCount / 2))) * Math.ceil(boardSize / 2);
+                const y = quadrant * Math.ceil(boardSize / 2);
+                startingPositions.push([x, y]);
+            }
+
+            // Function to create a connected region using DFS
+            const createRegion = async (startX, startY, color) => {
+                const visited = new Set();
+                const stack = [[startX, startY]];
+                visited.add(`${startX},${startY}`);
+                colorGrid[startX][startY] = color;
+
+                while (stack.length < regionSize + (color < remainingCells ? 1 : 0)) {
+                    const [x, y] = stack[stack.length - 1];
+                    const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+                    let validDirections = directions.filter(([dx, dy]) => {
                         const nx = x + dx;
                         const ny = y + dy;
-                        
-                        if (nx >= 0 && nx < boardSize && ny >= 0 && ny < boardSize && 
-                            grid[nx][ny] === c && !visited[nx][ny]) {
-                            visited[nx][ny] = true;
-                            queue.push([nx, ny]);
-                        }
+                        return nx >= 0 && nx < boardSize && ny >= 0 && ny < boardSize &&
+                            colorGrid[nx][ny] === null && !visited.has(`${nx},${ny}`);
                     });
+
+                    if (validDirections.length > 0) {
+                        const [dx, dy] = validDirections[Math.floor(Math.random() * validDirections.length)];
+                        const nx = x + dx;
+                        const ny = y + dy;
+                        visited.add(`${nx},${ny}`);
+                        colorGrid[nx][ny] = color;
+                        stack.push([nx, ny]);
+                        // Animate the cell
+                        await animateCell(nx, ny, color);
+                    } else {
+                        stack.pop();
+                    }
+                }
+            };
+
+            // Animate cell coloring
+            const animateCell = (x, y, color) => {
+                return new Promise(resolve => {
+                    const cell = document.querySelector(`[data-row="${x}"][data-col="${y}"]`);
+                    if (cell) {
+                        cell.style.backgroundColor = getColor(color);
+                        resolve();
+                    }
+                });
+            };
+
+            // Generate the board with animation
+            const generateBoardAsync = async () => {
+                boardDiv.style.gridTemplateColumns = `repeat(${boardSize}, 30px)`;
+                
+                // Create empty cells first
+                for (let i = 0; i < boardSize; i++) {
+                    for (let j = 0; j < boardSize; j++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'cell';
+                        cell.dataset.row = i;
+                        cell.dataset.col = j;
+                        cell.onclick = () => handleCellClick(i, j);
+                        boardDiv.appendChild(cell);
+                    }
                 }
 
-                // Check if all positions of this color were visited
-                for (const [i, j] of positions) {
-                    if (!visited[i][j]) return false;
+                // Create regions for each color with animation
+                for (let c = 0; c < colorCount; c++) {
+                    const size = regionSize + (c < remainingCells ? 1 : 0);
+                    await createRegion(...startingPositions[c], c);
                 }
-            }
-            
-            return true;
+            };
+
+            generateBoardAsync();
+        }
+
+        function getColor(colorIndex) {
+            const colors = [
+                '#FF6B6B', // Red
+                '#4ECDC4', // Teal
+                '#45B7D1', // Blue
+                '#96CEB4', // Light Green
+                '#FFEEAD'  // Yellow
+            ];
+            return colors[colorIndex % colors.length];
         }
 
         function handleCellClick(row, col) {
             const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
             
             if (cell.textContent === '♔') {
-                // Remove crown
                 crowns = crowns.filter(c => c.row !== row || c.col !== col);
                 cell.textContent = '';
                 cell.classList.remove('crown');
@@ -214,7 +209,6 @@
                 xMarks.delete(`${row},${col}`);
             } else {
                 if (isValidCrownPosition(row, col)) {
-                    // Place crown
                     crowns.push({row, col});
                     cell.textContent = '♔';
                     cell.classList.add('crown');
@@ -232,7 +226,7 @@
         }
 
         function isValidCrownPosition(row, col) {
-            return !crowns.some(c => c.row === row || c.col === col || 
+            return !crowns.some(c => c.row === row || c.col === col ||
                 document.querySelector(`[data-row="${c.row}"][data-col="${c.col}"]`).dataset.color ===
                 document.querySelector(`[data-row="${row}"][data-col="${col}"]`).dataset.color);
         }
@@ -260,9 +254,6 @@
                 }
             });
         }
-
-        // Initialize the board
-        generateBoard();
     </script>
 </body>
 </html>
