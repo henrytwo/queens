@@ -1,314 +1,217 @@
-<!--
-Rules:
-- exactly one piece in each row
-- exactly one piece in each col
-- exactly one piece in each color region
-- colored cells must be connected to each other
-- pieces cannot be adjacent to each other (side by side or diagonal)
-
-Pressing a cell once will mark it X to show it's eliminated, and pressing it once again will attempt to place a piece.
-
-You must also verify that the generated board satisfies the parameters specified by the user, and if it is not possible show an alert explaining why.
-
-If a piece is placed down, mark any cells that should be eliminated with an X, but these must be removed if that piece is removed. Do not remove
-manually placed pieces.
--->
-
-
 
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Crown Placement Game</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Board</title>
     <style>
-        .container {
-            text-align: center;
-            font-family: Arial, sans-serif;
-        }
-        .board {
-            display: grid;
-            gap: 2px;
-            margin: 20px auto;
-            background: #333;
-            padding: 2px;
-            border-radius: 5px;
-        }
-        .cell {
-            width: 30px;
-            height: 30px;
-            background: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            cursor: pointer;
-            border: 1px solid #ccc;
-            transition: all 0.2s ease;
-        }
-        .cell.x {
-            background: #ffcccc;
-        }
-        .cell.crown {
-            background: #ccccff;
+        pre {
+            font-family: monospace;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div>
-            <select id="size">
-                <option value="4">4x4</option>
-                <option value="5">5x5</option>
-                <option value="6">6x6</option>
-                <option value="7">7x7</option>
-                <option value="8">8x8</option>
-            </select>
-            <select id="colorCount">
-                <option value="2">2 Colors</option>
-                <option value="3">3 Colors</option>
-                <option value="4">4 Colors</option>
-                <option value="5">5 Colors</option>
-            </select>
-            <button onclick="generateBoard()">Start</button>
-        </div>
-        <div id="board" class="board"></div>
-    </div>
-
+    <pre id="output"></pre>
     <script>
-        let boardSize = 4;
-        let colorCount = 2;
-        let board = [];
-        let crowns = [];
-        let xMarks = new Set();
-        let colors = {};
-
-        function generateBoard() {
-            crowns = [];
-            xMarks.clear();
-            const boardDiv = document.getElementById('board');
-            boardDiv.innerHTML = '';
-
-            boardSize = parseInt(document.getElementById('size').value);
-            colorCount = parseInt(document.getElementById('colorCount').value);
-
-            const totalCells = boardSize * boardSize;
-            const minRegionSize = Math.ceil(totalCells / colorCount);
-            
-            if (minRegionSize < 4) {
-                alert('Impossible to create a valid board with the specified parameters.');
-                return;
-            }
-
-            // Create empty cells first
-            boardDiv.style.gridTemplateColumns = `repeat(${boardSize}, 30px)`;
-            for (let i = 0; i < boardSize; i++) {
-                for (let j = 0; j < boardSize; j++) {
-                    const cell = document.createElement('div');
-                    cell.className = 'cell';
-                    cell.dataset.row = i;
-                    cell.dataset.col = j;
-                    cell.dataset.color = '';
-                    cell.onclick = () => handleCellClick(i, j);
-                    boardDiv.appendChild(cell);
+        class Board {
+            constructor(size) {
+                this.size = size;
+                this.board = Array(size).fill(0).map(() => Array(size).fill(0));
+                this.solutions = this._generateSolutions(1000);
+                if (this.solutions !== null) {
+                    this._generateColors();
+                } else {
+                    console.log("Failed to generate solutions after 1000 attempts.");
                 }
             }
 
-            // Generate and animate color regions
-            const colorRegions = new ColorRegions(boardSize, colorCount, totalCells);
-            colorRegions.animateGeneration();
-        }
+            _generateSolutions(maxAttempts) {
+                let attempts = 0;
+                while (attempts < maxAttempts) {
+                    let solutions = new Set();
+                    let availableSolutions = new Set();
 
-        class ColorRegions {
-            constructor(size, count, totalCells) {
-                this.size = size;
-                this.count = count;
-                this.regions = Array.from({ length: size }, () => 
-                    Array(size).fill(null));
-                this.distinctColors = [
-                    '#FF6B6B', // Red
-                    '#4ECDC4', // Teal
-                    '#45B7D1', // Blue
-                    '#96CEB4', // Light Green
-                    '#FFEEAD', // Yellow
-                    '#FFB5E8', // Pink
-                    '#9D95BE', // Purple
-                    '#F7D2C4', // Peach
-                    '#7ABC66', // Mint
-                    '#C74B50'  // Wine
-                ];
+                    for (let i = 0; i < this.size; i++) {
+                        for (let j = 0; j < this.size; j++) {
+                            availableSolutions.add(`${i},${j}`);
+                        }
+                    }
+
+                    let self = this;
+
+                    function _selectCoordinate() {
+                        if (availableSolutions.size === 0) {
+                            return null;
+                        }
+
+                        let idx = Math.floor(Math.random() * availableSolutions.size);
+                        let i, j;
+                        let arr = Array.from(availableSolutions);
+                        let coord = arr[idx].split(',').map(Number);
+                        i = coord[0];
+                        j = coord[1];
+
+                        // Remove the 8 adjacent cells too, in addition to the one we just selected.
+                        for (let ni = i - 1; ni <= i + 1; ni++) {
+                            for (let nj = j - 1; nj <= j + 1; nj++) {
+                                if (availableSolutions.has(`${ni},${nj}`)) {
+                                    availableSolutions.delete(`${ni},${nj}`);
+                                }
+                            }
+                        }
+
+                        // Remove everything in the same row.
+                        for (let nj = 0; nj < self.size; nj++) {
+                            if (availableSolutions.has(`${i},${nj}`)) {
+                                availableSolutions.delete(`${i},${nj}`);
+                            }
+                        }
+
+                        // Remove everything in the same column.
+                        for (let ni = 0; ni < self.size; ni++) {
+                            if (availableSolutions.has(`${ni},${j}`)) {
+                                availableSolutions.delete(`${ni},${j}`);
+                            }
+                        }
+
+                        return [i, j];
+                    }
+
+                    for (let _ = 0; _ < this.size; _++) {
+                        let solution = _selectCoordinate();
+
+                        if (solution) {
+                            solutions.add(solution.join(','));
+                        } else {
+                            break;
+                        }
+                    }
+
+                    if (solutions.size === this.size) {
+                        return solutions;
+                    }
+
+                    attempts++;
+                }
+
+                return null;
             }
 
-            animateGeneration() {
-                const totalCells = this.size * this.size;
-                const regionSize = Math.floor(totalCells / this.count);
-                const remainder = totalCells % this.count;
+            _getNeighbours(i, j) {
+                let next = [
+                    [-1, -1],
+                    [-1, 0],
+                    [-1, 1],
+                    [0, -1],
+                    [0, 1],
+                    [1, -1],
+                    [1, 0],
+                    [1, 1],
+                ];
 
-                let currentColor = 0;
-                let currentRegionSize = regionSize;
-                let remaining = remainder;
+                let neighbours = [];
+
+                for (let [dx, dy] of next) {
+                    let nx = i + dx;
+                    let ny = j + dy;
+
+                    if (0 <= nx && nx < this.size && 0 <= ny && ny < this.size) {
+                        neighbours.push([nx, ny]);
+                    }
+                }
+
+                return neighbours;
+            }
+
+            _fillHoles() {
+                let q = [];
 
                 for (let i = 0; i < this.size; i++) {
                     for (let j = 0; j < this.size; j++) {
-                        if (this.regions[i][j] === null) {
-                            if (remaining > 0) {
-                                currentRegionSize = regionSize + 1;
-                                remaining--;
-                            } else {
-                                currentRegionSize = regionSize;
-                            }
-                            
-                            this.fillRegion(i, j, currentColor, currentRegionSize);
-                            currentColor = (currentColor + 1) % this.distinctColors.length;
-                        }
-                    }
-                }
-            }
-
-            fillRegion(startX, startY, color, size) {
-                const queue = [[startX, startY]];
-                this.regions[startX][startY] = color;
-                this.updateCell(startX, startY, color);
-                let filled = 1;
-
-                const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
-
-                function processQueue() {
-                    if (filled >= size) return;
-
-                    const [x, y] = queue.shift();
-
-                    for (const [dx, dy] of directions) {
-                        const nx = x + dx;
-                        const ny = y + dy;
-                        if (nx >= 0 && nx < startX.length && ny >= 0 && ny < startY.length &&
-                            this.regions[nx][ny] === null) {
-                            this.regions[nx][ny] = color;
-                            this.updateCell(nx, ny, color);
-                            filled++;
-                            queue.push([nx, ny]);
-                            
-                            if (filled < size) {
-                                requestAnimationFrame(processQueue.bind(this));
+                        if (this.board[i][j] === 0) {
+                            for (let [nx, ny] of this._getNeighbours(i, j)) {
+                                let color = this.board[nx][ny];
+                                if (color !== 0) {
+                                    q.push([i, j, color]);
+                                    break;
+                                }
                             }
                         }
                     }
                 }
 
-                requestAnimationFrame(processQueue.bind(this));
-            }
+                while (q.length > 0) {
+                    let [i, j, color] = q.shift();
 
-            updateCell(x, y, color) {
-                const cell = document.querySelector(`[data-row="${x}"][data-col="${y}"]`);
-                if (cell) {
-                    cell.dataset.color = color;
-                    cell.style.backgroundColor = this.distinctColors[color % this.distinctColors.length];
-                    cell.style.transition = 'all 0.2s ease';
-                }
-            }
+                    if (this.board[i][j] === 0) {
+                        this.board[i][j] = color;
 
-            isValid(x, y) {
-                return x >= 0 && x < this.size && y >= 0 && y < this.size;
-            }
-        }
-
-        function handleCellClick(row, col) {
-            const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
-            
-            if (cell.textContent === '♔') {
-                removeCrown(row, col);
-            } else if (cell.textContent === '×') {
-                cell.textContent = '';
-                cell.classList.remove('x');
-                xMarks.delete(`${row},${col}`);
-            } else {
-                if (!xMarks.has(`${row},${col}`)) {
-                    cell.textContent = '×';
-                    cell.classList.add('x');
-                    xMarks.add(`${row},${col}`);
-                } else {
-                    if (isValidMove(row, col)) {
-                        placeCrown(row, col);
-                    } else {
-                        alert('Illegal move!');
-                    }
-                }
-            }
-            updateEliminatedCells();
-        }
-
-        function isValidMove(row, col) {
-            // Check same row
-            const sameRow = crowns.every(crown => crown.row !== row);
-            
-            // Check same column
-            const sameCol = crowns.every(crown => crown.col !== col);
-            
-            // Check same color region
-            const cellColor = document.querySelector(`[data-row="${row}"][data-col="${col}"]`).dataset.color;
-            const sameColor = crowns.every(crown => 
-                document.querySelector(`[data-row="${crown.row}"][data-col="${crown.col}"]`).dataset.color !== cellColor
-            );
-            
-            // Check adjacency
-            const directions = [[-1, 0], [1, 0], [0, -1], [0, 1], 
-                              [-1, -1], [-1, 1], [1, -1], [1, 1]];
-            const noAdjacency = directions.every(([dx, dy]) => {
-                const nx = row + dx;
-                const ny = col + dy;
-                return !document.querySelector(`[data-row="${nx}"][data-col="${ny}"]`)?.textContent === '♔';
-            });
-
-            return sameRow && sameCol && sameColor && noAdjacency;
-        }
-
-        function placeCrown(row, col) {
-            crowns.push({row, col});
-            const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
-            cell.textContent = '♔';
-            cell.classList.add('crown');
-        }
-
-        function removeCrown(row, col) {
-            crowns = crowns.filter(c => c.row !== row || c.col !== col);
-            const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
-            cell.textContent = '';
-            cell.classList.remove('crown');
-        }
-
-        function updateEliminatedCells() {
-            document.querySelectorAll('.cell').forEach(cell => {
-                const row = parseInt(cell.dataset.row);
-                const col = parseInt(cell.dataset.col);
-                
-                if (!cell.textContent) {
-                    const isInvalid = crowns.some(c => c.row === row || c.col === col ||
-                        document.querySelector(`[data-row="${c.row}"][data-col="${c.col}"]`).dataset.color ===
-                        document.querySelector(`[data-row="${row}"][data-col="${col}"]`).dataset.color);
-                    
-                    if (isInvalid) {
-                        if (!xMarks.has(`${row},${col}`)) {
-                            cell.textContent = '×';
-                            cell.classList.add('x');
-                            xMarks.add(`${row},${col}`);
-                        }
-                    } else {
-                        if (xMarks.has(`${row},${col}`)) {
-                            cell.textContent = '';
-                            cell.classList.remove('x');
-                            xMarks.delete(`${row},${col}`);
+                        for (let [nx, ny] of this._getNeighbours(i, j)) {
+                            q.push([nx, ny, color]);
                         }
                     }
                 }
-            });
+            }
+
+            _fill(color, solution, cellCount) {
+                let q = [];
+
+                q.push(solution);
+                for (let _ = 0; _ < cellCount; _++) {
+                    if (q.length > 0) {
+                        let [i, j] = q.shift();
+
+                        this.board[i][j] = color;
+
+                        for (let [nx, ny] of this._getNeighbours(i, j)) {
+                            if (!this.solutions.has(`${nx},${ny}`) && this.board[nx][ny] === 0) {
+                                q.push([nx, ny]);
+                            }
+                        }
+                    }
+                }
+            }
+
+            _generateColors() {
+                // Generate main colors
+                let idx = 1;
+                for (let solution of this.solutions) {
+                    let [i, j] = solution.split(',').map(Number);
+                    let color = idx++;
+                    let cellCount = Math.floor(Math.random() * (2 / 3 * this.size ** 2)) + 1;
+
+                    this._fill(color, [i, j], cellCount);
+                }
+
+                // Fill in any remaining holes with nearest adjacent color
+                this._fillHoles();
+            }
+
+            toString() {
+                let out = '';
+
+                for (let x = 0; x < this.board.length; x++) {
+                    let rowStr = '';
+                    for (let y = 0; y < this.board[0].length; y++) {
+                        // Draw white block if this tile is part of the solution
+                        let suffix = this.solutions && this.solutions.has(`${x},${y}`) ? '■' : ' ';
+                        let value = this.board[x][y] || ' ';
+                        rowStr += `[${suffix}${value.toString().padStart(2)}${suffix}]`;
+                    }
+
+                    if (rowStr) {
+                        out += rowStr + '\n';
+                    }
+                }
+
+                return out;
+            }
         }
 
-        function getCellColor(row, col) {
-            return document.querySelector(`[data-row="${row}"][data-col="${col}"]`).dataset.color;
-        }
-
-        function isValidCell(x, y) {
-            return x >= 0 && x < boardSize && y >= 0 && y < boardSize;
-        }
+        let board = new Board(8);
+        console.log(board.toString());
+        document.getElementById('output').innerText = board.toString();
     </script>
 </body>
 </html>

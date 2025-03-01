@@ -1,0 +1,15 @@
+<!--
+Rules:
+- exactly one piece in each row
+- exactly one piece in each col
+- exactly one piece in each color region
+- colored cells must be connected to each other
+- pieces cannot be adjacent to each other (side by side or diagonal)
+
+Pressing a cell once will mark it X to show it's eliminated, and pressing it once again will attempt to place a piece.
+
+You must also verify that the generated board satisfies the parameters specified by the user, and if it is not possible show an alert explaining why.
+
+If a piece is placed down, mark any cells that should be eliminated with an X, but these must be removed if that piece is removed. Do not remove
+manually placed pieces.
+-->
