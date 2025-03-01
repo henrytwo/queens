@@ -5,11 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Board</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css">
     <style>
         .board {
             display: grid;
-            grid-template-columns: repeat(8, 50px);
-            grid-template-rows: repeat(8, 50px);
             gap: 2px;
         }
 
@@ -20,22 +19,8 @@
             font-size: 24px;
             border: 1px solid black;
             position: relative;
-        }
-
-        #size-select {
             width: 50px;
-        }
-
-        #start-button {
-            margin-left: 10px;
-        }
-
-        #timer {
-            margin-left: 10px;
-        }
-
-        #result {
-            margin-top: 10px;
+            height: 50px;
         }
 
         .incorrect {
@@ -68,28 +53,38 @@
     </style>
 </head>
 <body>
-    <select id="size-select">
-        <option value="8">8</option>
-        <option value="9">9</option>
-        <option value="10">10</option>
-        <option value="11">11</option>
-        <option value="12">12</option>
-        <option value="13">13</option>
-        <option value="14">14</option>
-        <option value="15">15</option>
-        <option value="16">16</option>
-        <option value="17">17</option>
-        <option value="18">18</option>
-        <option value="19">19</option>
-        <option value="20">20</option>
-    </select>
-    <button id="start-button">Generate</button>
-    <button id="clear-button">Clear</button>
-    <span id="timer">00:00:00</span>
-    <input type="checkbox" id="show-solution-button">
-    <label for="show-solution-button">Show Solution</label>
-    <div id="result"></div>
-    <div class="board" id="board"></div>
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-6 text-center">
+                <h1>Board Game</h1>
+                <span id="timer" class="ms-2" style="font-size: 36px;">00:00:00</span>
+                <div class="mt-3">
+                    <select id="size-select" class="form-select">
+                        <option value="8">8</option>
+                        <option value="9">9</option>
+                        <option value="10">10</option>
+                        <option value="11">11</option>
+                        <option value="12">12</option>
+                        <option value="13">13</option>
+                        <option value="14">14</option>
+                        <option value="15">15</option>
+                        <option value="16">16</option>
+                        <option value="17">17</option>
+                        <option value="18">18</option>
+                        <option value="19">19</option>
+                        <option value="20">20</option>
+                    </select>
+                </div>
+                <div class="mt-3">
+                    <button id="start-button" class="btn btn-primary me-2">Generate</button>
+                    <button id="clear-button" class="btn btn-secondary me-2">Clear</button>
+                    <button id="show-solution-button" class="btn btn-secondary">Show Solution</button>
+                </div>
+                <div id="result" class="mt-3"></div>
+                <div id="board" class="board mt-3" style="width: 100%;"></div>
+            </div>
+        </div>
+    </div>
     <script>
         class Board {
             constructor(size) {
@@ -309,7 +304,7 @@
                         let userPlacedCrown = this.userPlacedCrowns.has(`${i},${j}`);
                         let userEliminated = this.userEliminatedCells.has(`${i},${j}`);
                         let userInitiatedX = this.userInitiatedXCells.has(`${i},${j}`);
-                        let showSolution = document.getElementById('show-solution-button').checked;
+                        let showSolution = document.getElementById('show-solution-button').innerText === 'Hide Solution';
 
                         cellElement.style.background = this.getColor(color);
 
@@ -553,24 +548,24 @@
         let startTime;
 
         document.getElementById('start-button').addEventListener('click', () => {
+            clearInterval(timerInterval);
+            document.getElementById('timer').innerText = '00:00:00';
             let size = parseInt(document.getElementById('size-select').value);
             board = new Board(size);
             board.render();
-            if (!startTime) {
-                startTime = new Date();
-                timerInterval = setInterval(() => {
-                    let currentTime = new Date();
-                    let elapsed = (currentTime - startTime) / 1000;
-                    let hours = Math.floor(elapsed / 3600);
-                    let minutes = Math.floor((elapsed % 3600) / 60);
-                    let seconds = Math.floor(elapsed % 60);
-                    document.getElementById('timer').innerText = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                    if (board.checkForWin()) {
-                        clearInterval(timerInterval);
-                        document.getElementById('result').innerText = 'You won!';
-                    }
-                }, 1000);
-            }
+            startTime = new Date();
+            timerInterval = setInterval(() => {
+                let currentTime = new Date();
+                let elapsed = (currentTime - startTime) / 1000;
+                let hours = Math.floor(elapsed / 3600);
+                let minutes = Math.floor((elapsed % 3600) / 60);
+                let seconds = Math.floor(elapsed % 60);
+                document.getElementById('timer').innerText = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                if (board.checkForWin()) {
+                    clearInterval(timerInterval);
+                    document.getElementById('result').innerText = 'You won!';
+                }
+            }, 1000);
         });
 
         document.getElementById('clear-button').addEventListener('click', () => {
@@ -578,6 +573,7 @@
                 board.clear();
             }
             clearInterval(timerInterval);
+            document.getElementById('timer').innerText = '00:00:00';
             startTime = new Date();
             timerInterval = setInterval(() => {
                 let currentTime = new Date();
@@ -594,7 +590,12 @@
             document.getElementById('result').innerText = '';
         });
 
-        document.getElementById('show-solution-button').addEventListener('change', () => {
+        document.getElementById('show-solution-button').addEventListener('click', () => {
+            if (document.getElementById('show-solution-button').innerText === 'Show Solution') {
+                document.getElementById('show-solution-button').innerText = 'Hide Solution';
+            } else {
+                document.getElementById('show-solution-button').innerText = 'Show Solution';
+            }
             if (board) {
                 board.render();
             }
