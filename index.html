@@ -556,19 +556,21 @@
             let size = parseInt(document.getElementById('size-select').value);
             board = new Board(size);
             board.render();
-            startTime = new Date();
-            timerInterval = setInterval(() => {
-                let currentTime = new Date();
-                let elapsed = (currentTime - startTime) / 1000;
-                let hours = Math.floor(elapsed / 3600);
-                let minutes = Math.floor((elapsed % 3600) / 60);
-                let seconds = Math.floor(elapsed % 60);
-                document.getElementById('timer').innerText = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                if (board.checkForWin()) {
-                    clearInterval(timerInterval);
-                    document.getElementById('result').innerText = 'You won!';
-                }
-            }, 1000);
+            if (!startTime) {
+                startTime = new Date();
+                timerInterval = setInterval(() => {
+                    let currentTime = new Date();
+                    let elapsed = (currentTime - startTime) / 1000;
+                    let hours = Math.floor(elapsed / 3600);
+                    let minutes = Math.floor((elapsed % 3600) / 60);
+                    let seconds = Math.floor(elapsed % 60);
+                    document.getElementById('timer').innerText = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    if (board.checkForWin()) {
+                        clearInterval(timerInterval);
+                        document.getElementById('result').innerText = 'You won!';
+                    }
+                }, 1000);
+            }
         });
 
         document.getElementById('clear-button').addEventListener('click', () => {
