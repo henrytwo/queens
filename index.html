@@ -6,13 +6,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Board</title>
     <style>
-        pre {
-            font-family: monospace;
+        .board {
+            display: grid;
+            grid-template-columns: repeat(8, 50px);
+            grid-template-rows: repeat(8, 50px);
+            gap: 2px;
+        }
+
+        .cell {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            border: 1px solid black;
         }
     </style>
 </head>
 <body>
-    <pre id="output"></pre>
+    <div class="board" id="board"></div>
     <script>
         class Board {
             constructor(size) {
@@ -100,14 +111,10 @@
 
             _getNeighbours(i, j) {
                 let next = [
-                    [-1, -1],
                     [-1, 0],
-                    [-1, 1],
+                    [1, 0],
                     [0, -1],
                     [0, 1],
-                    [1, -1],
-                    [1, 0],
-                    [1, 1],
                 ];
 
                 let neighbours = [];
@@ -122,6 +129,32 @@
                 }
 
                 return neighbours;
+            }
+
+            _getAdjacentCells(i, j) {
+                let next = [
+                    [-1, -1],
+                    [-1, 0],
+                    [-1, 1],
+                    [0, -1],
+                    [0, 1],
+                    [1, -1],
+                    [1, 0],
+                    [1, 1],
+                ];
+
+                let adjacentCells = [];
+
+                for (let [dx, dy] of next) {
+                    let nx = i + dx;
+                    let ny = j + dy;
+
+                    if (0 <= nx && nx < this.size && 0 <= ny && ny < this.size) {
+                        adjacentCells.push([nx, ny]);
+                    }
+                }
+
+                return adjacentCells;
             }
 
             _fillHoles() {
@@ -158,7 +191,7 @@
                 let q = [];
 
                 q.push(solution);
-                for (let _ = 0; _ < cellCount; _++) {
+                for (let _ = 0; _ < Math.min(cellCount, this.size * this.size / this.size); _++) {
                     if (q.length > 0) {
                         let [i, j] = q.shift();
 
@@ -179,7 +212,7 @@
                 for (let solution of this.solutions) {
                     let [i, j] = solution.split(',').map(Number);
                     let color = idx++;
-                    let cellCount = Math.floor(Math.random() * (2 / 3 * this.size ** 2)) + 1;
+                    let cellCount = Math.floor(Math.random() * (this.size * this.size / (this.size * 2))) + 1;
 
                     this._fill(color, [i, j], cellCount);
                 }
@@ -188,30 +221,94 @@
                 this._fillHoles();
             }
 
-            toString() {
-                let out = '';
+            render() {
+                let boardElement = document.getElementById('board');
+                boardElement.innerHTML = '';
+                boardElement.style.gridTemplateColumns = `repeat(${this.size}, 50px)`;
+                boardElement.style.gridTemplateRows = `repeat(${this.size}, 50px)`;
 
-                for (let x = 0; x < this.board.length; x++) {
-                    let rowStr = '';
-                    for (let y = 0; y < this.board[0].length; y++) {
-                        // Draw white block if this tile is part of the solution
-                        let suffix = this.solutions && this.solutions.has(`${x},${y}`) ? '■' : ' ';
-                        let value = this.board[x][y] || ' ';
-                        rowStr += `[${suffix}${value.toString().padStart(2)}${suffix}]`;
-                    }
+                for (let i = 0; i < this.size; i++) {
+                    for (let j = 0; j < this.size; j++) {
+                        let cellElement = document.createElement('div');
+                        cellElement.classList.add('cell');
 
-                    if (rowStr) {
-                        out += rowStr + '\n';
+                        let color = this.board[i][j];
+                        let solution = this.solutions.has(`${i},${j}`);
+
+                        if (solution) {
+                            cellElement.style.background = this.getColor(color);
+                            cellElement.innerText = '👑';
+                        } else {
+                            cellElement.style.background = this.getColor(color);
+                        }
+
+                        boardElement.appendChild(cellElement);
                     }
                 }
+            }
 
-                return out;
+            getColor(color) {
+                let colors = [];
+                let step = 1.0 / this.size;
+                for (let i = 0; i < this.size; i++) {
+                    colors.push(this.hsvToRgb(i * step, 1, 1));
+                }
+
+                return colors[color - 1] || '#FFFFFF';
+            }
+
+            hsvToRgb(h, s, v) {
+                let r, g, b;
+
+                let i = Math.floor(h * 6);
+                let f = h * 6 - i;
+                let p = v * (1 - s);
+                let q = v * (1 - f * s);
+                let t = v * (1 - (1 - f) * s);
+
+                switch (i % 6) {
+                    case 0:
+                        r = v;
+                        g = t;
+                        b = p;
+                        break;
+                    case 1:
+                        r = q;
+                        g = v;
+                        b = p;
+                        break;
+                    case 2:
+                        r = p;
+                        g = v;
+                        b = t;
+                        break;
+                    case 3:
+                        r = p;
+                        g = q;
+                        b = v;
+                        break;
+                    case 4:
+                        r = t;
+                        g = p;
+                        b = v;
+                        break;
+                    case 5:
+                        r = v;
+                        g = p;
+                        b = q;
+                        break;
+                }
+
+                return `#${Math.round(r * 255).toString(16).padStart(2, '0')}${Math.round(g * 255).toString(16).padStart(2, '0')}${Math.round(b * 255).toString(16).padStart(2, '0')}`;
             }
         }
 
         let board = new Board(8);
-        console.log(board.toString());
-        document.getElementById('output').innerText = board.toString();
+        if (board.solutions !== null) {
+            board.render();
+        } else {
+            console.log("Failed to generate solutions after 1000 attempts.");
+        }
     </script>
 </body>
 </html>
