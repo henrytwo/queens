@@ -15,6 +15,7 @@ manually placed pieces.
 -->
 
 
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -42,7 +43,7 @@ manually placed pieces.
             font-size: 20px;
             cursor: pointer;
             border: 1px solid #ccc;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
         }
         .cell.x {
             background: #ffcccc;
@@ -82,163 +83,207 @@ manually placed pieces.
         let colors = {};
 
         function generateBoard() {
-            // Reset the board
             crowns = [];
             xMarks.clear();
             const boardDiv = document.getElementById('board');
             boardDiv.innerHTML = '';
 
-            // Get parameters
             boardSize = parseInt(document.getElementById('size').value);
             colorCount = parseInt(document.getElementById('colorCount').value);
 
-            // Check if it's possible to create valid regions
-            if (colorCount > boardSize || (boardSize * boardSize) / colorCount < 4) {
+            const totalCells = boardSize * boardSize;
+            const minRegionSize = Math.ceil(totalCells / colorCount);
+            
+            if (minRegionSize < 4) {
                 alert('Impossible to create a valid board with the specified parameters.');
                 return;
             }
 
-            // Create an empty grid
-            const colorGrid = Array.from({ length: boardSize }, () => 
-                Array(boardSize).fill(null));
-
-            // Calculate the size of each color region
-            const regionSize = Math.floor((boardSize * boardSize) / colorCount);
-            const remainingCells = (boardSize * boardSize) % colorCount;
-
-            // Assign starting positions for each color to ensure they're spread out
-            const startingPositions = [];
-            for (let c = 0; c < colorCount; c++) {
-                const quadrant = Math.floor(c / (Math.ceil(colorCount / 2)));
-                const x = Math.floor((c % Math.ceil(colorCount / 2))) * Math.ceil(boardSize / 2);
-                const y = quadrant * Math.ceil(boardSize / 2);
-                startingPositions.push([x, y]);
+            // Create empty cells first
+            boardDiv.style.gridTemplateColumns = `repeat(${boardSize}, 30px)`;
+            for (let i = 0; i < boardSize; i++) {
+                for (let j = 0; j < boardSize; j++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.row = i;
+                    cell.dataset.col = j;
+                    cell.dataset.color = '';
+                    cell.onclick = () => handleCellClick(i, j);
+                    boardDiv.appendChild(cell);
+                }
             }
 
-            // Function to create a connected region using DFS
-            const createRegion = async (startX, startY, color) => {
-                const visited = new Set();
-                const stack = [[startX, startY]];
-                visited.add(`${startX},${startY}`);
-                colorGrid[startX][startY] = color;
-
-                while (stack.length < regionSize + (color < remainingCells ? 1 : 0)) {
-                    const [x, y] = stack[stack.length - 1];
-                    const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
-                    let validDirections = directions.filter(([dx, dy]) => {
-                        const nx = x + dx;
-                        const ny = y + dy;
-                        return nx >= 0 && nx < boardSize && ny >= 0 && ny < boardSize &&
-                            colorGrid[nx][ny] === null && !visited.has(`${nx},${ny}`);
-                    });
-
-                    if (validDirections.length > 0) {
-                        const [dx, dy] = validDirections[Math.floor(Math.random() * validDirections.length)];
-                        const nx = x + dx;
-                        const ny = y + dy;
-                        visited.add(`${nx},${ny}`);
-                        colorGrid[nx][ny] = color;
-                        stack.push([nx, ny]);
-                        // Animate the cell
-                        await animateCell(nx, ny, color);
-                    } else {
-                        stack.pop();
-                    }
-                }
-            };
-
-            // Animate cell coloring
-            const animateCell = (x, y, color) => {
-                return new Promise(resolve => {
-                    const cell = document.querySelector(`[data-row="${x}"][data-col="${y}"]`);
-                    if (cell) {
-                        cell.style.backgroundColor = getColor(color);
-                        resolve();
-                    }
-                });
-            };
-
-            // Generate the board with animation
-            const generateBoardAsync = async () => {
-                boardDiv.style.gridTemplateColumns = `repeat(${boardSize}, 30px)`;
-                
-                // Create empty cells first
-                for (let i = 0; i < boardSize; i++) {
-                    for (let j = 0; j < boardSize; j++) {
-                        const cell = document.createElement('div');
-                        cell.className = 'cell';
-                        cell.dataset.row = i;
-                        cell.dataset.col = j;
-                        cell.onclick = () => handleCellClick(i, j);
-                        boardDiv.appendChild(cell);
-                    }
-                }
-
-                // Create regions for each color with animation
-                for (let c = 0; c < colorCount; c++) {
-                    const size = regionSize + (c < remainingCells ? 1 : 0);
-                    await createRegion(...startingPositions[c], c);
-                }
-            };
-
-            generateBoardAsync();
+            // Generate and animate color regions
+            const colorRegions = new ColorRegions(boardSize, colorCount, totalCells);
+            colorRegions.animateGeneration();
         }
 
-        function getColor(colorIndex) {
-            const colors = [
-                '#FF6B6B', // Red
-                '#4ECDC4', // Teal
-                '#45B7D1', // Blue
-                '#96CEB4', // Light Green
-                '#FFEEAD'  // Yellow
-            ];
-            return colors[colorIndex % colors.length];
+        class ColorRegions {
+            constructor(size, count, totalCells) {
+                this.size = size;
+                this.count = count;
+                this.regions = Array.from({ length: size }, () => 
+                    Array(size).fill(null));
+                this.distinctColors = [
+                    '#FF6B6B', // Red
+                    '#4ECDC4', // Teal
+                    '#45B7D1', // Blue
+                    '#96CEB4', // Light Green
+                    '#FFEEAD', // Yellow
+                    '#FFB5E8', // Pink
+                    '#9D95BE', // Purple
+                    '#F7D2C4', // Peach
+                    '#7ABC66', // Mint
+                    '#C74B50'  // Wine
+                ];
+            }
+
+            animateGeneration() {
+                const totalCells = this.size * this.size;
+                const regionSize = Math.floor(totalCells / this.count);
+                const remainder = totalCells % this.count;
+
+                let currentColor = 0;
+                let currentRegionSize = regionSize;
+                let remaining = remainder;
+
+                for (let i = 0; i < this.size; i++) {
+                    for (let j = 0; j < this.size; j++) {
+                        if (this.regions[i][j] === null) {
+                            if (remaining > 0) {
+                                currentRegionSize = regionSize + 1;
+                                remaining--;
+                            } else {
+                                currentRegionSize = regionSize;
+                            }
+                            
+                            this.fillRegion(i, j, currentColor, currentRegionSize);
+                            currentColor = (currentColor + 1) % this.distinctColors.length;
+                        }
+                    }
+                }
+            }
+
+            fillRegion(startX, startY, color, size) {
+                const queue = [[startX, startY]];
+                this.regions[startX][startY] = color;
+                this.updateCell(startX, startY, color);
+                let filled = 1;
+
+                const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+
+                function processQueue() {
+                    if (filled >= size) return;
+
+                    const [x, y] = queue.shift();
+
+                    for (const [dx, dy] of directions) {
+                        const nx = x + dx;
+                        const ny = y + dy;
+                        if (nx >= 0 && nx < startX.length && ny >= 0 && ny < startY.length &&
+                            this.regions[nx][ny] === null) {
+                            this.regions[nx][ny] = color;
+                            this.updateCell(nx, ny, color);
+                            filled++;
+                            queue.push([nx, ny]);
+                            
+                            if (filled < size) {
+                                requestAnimationFrame(processQueue.bind(this));
+                            }
+                        }
+                    }
+                }
+
+                requestAnimationFrame(processQueue.bind(this));
+            }
+
+            updateCell(x, y, color) {
+                const cell = document.querySelector(`[data-row="${x}"][data-col="${y}"]`);
+                if (cell) {
+                    cell.dataset.color = color;
+                    cell.style.backgroundColor = this.distinctColors[color % this.distinctColors.length];
+                    cell.style.transition = 'all 0.2s ease';
+                }
+            }
+
+            isValid(x, y) {
+                return x >= 0 && x < this.size && y >= 0 && y < this.size;
+            }
         }
 
         function handleCellClick(row, col) {
             const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
             
             if (cell.textContent === '♔') {
-                crowns = crowns.filter(c => c.row !== row || c.col !== col);
-                cell.textContent = '';
-                cell.classList.remove('crown');
-                updateXMarks();
+                removeCrown(row, col);
             } else if (cell.textContent === '×') {
                 cell.textContent = '';
                 cell.classList.remove('x');
                 xMarks.delete(`${row},${col}`);
             } else {
-                if (isValidCrownPosition(row, col)) {
-                    crowns.push({row, col});
-                    cell.textContent = '♔';
-                    cell.classList.add('crown');
-                    updateXMarks();
+                if (!xMarks.has(`${row},${col}`)) {
+                    cell.textContent = '×';
+                    cell.classList.add('x');
+                    xMarks.add(`${row},${col}`);
                 } else {
-                    if (!xMarks.has(`${row},${col}`)) {
-                        cell.textContent = '×';
-                        cell.classList.add('x');
-                        xMarks.add(`${row},${col}`);
+                    if (isValidMove(row, col)) {
+                        placeCrown(row, col);
                     } else {
                         alert('Illegal move!');
                     }
                 }
             }
+            updateEliminatedCells();
         }
 
-        function isValidCrownPosition(row, col) {
-            return !crowns.some(c => c.row === row || c.col === col ||
-                document.querySelector(`[data-row="${c.row}"][data-col="${c.col}"]`).dataset.color ===
-                document.querySelector(`[data-row="${row}"][data-col="${col}"]`).dataset.color);
+        function isValidMove(row, col) {
+            // Check same row
+            const sameRow = crowns.every(crown => crown.row !== row);
+            
+            // Check same column
+            const sameCol = crowns.every(crown => crown.col !== col);
+            
+            // Check same color region
+            const cellColor = document.querySelector(`[data-row="${row}"][data-col="${col}"]`).dataset.color;
+            const sameColor = crowns.every(crown => 
+                document.querySelector(`[data-row="${crown.row}"][data-col="${crown.col}"]`).dataset.color !== cellColor
+            );
+            
+            // Check adjacency
+            const directions = [[-1, 0], [1, 0], [0, -1], [0, 1], 
+                              [-1, -1], [-1, 1], [1, -1], [1, 1]];
+            const noAdjacency = directions.every(([dx, dy]) => {
+                const nx = row + dx;
+                const ny = col + dy;
+                return !document.querySelector(`[data-row="${nx}"][data-col="${ny}"]`)?.textContent === '♔';
+            });
+
+            return sameRow && sameCol && sameColor && noAdjacency;
         }
 
-        function updateXMarks() {
+        function placeCrown(row, col) {
+            crowns.push({row, col});
+            const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+            cell.textContent = '♔';
+            cell.classList.add('crown');
+        }
+
+        function removeCrown(row, col) {
+            crowns = crowns.filter(c => c.row !== row || c.col !== col);
+            const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+            cell.textContent = '';
+            cell.classList.remove('crown');
+        }
+
+        function updateEliminatedCells() {
             document.querySelectorAll('.cell').forEach(cell => {
                 const row = parseInt(cell.dataset.row);
                 const col = parseInt(cell.dataset.col);
                 
                 if (!cell.textContent) {
                     const isInvalid = crowns.some(c => c.row === row || c.col === col ||
-                        cell.dataset.color === document.querySelector(`[data-row="${c.row}"][data-col="${c.col}"]`).dataset.color);
+                        document.querySelector(`[data-row="${c.row}"][data-col="${c.col}"]`).dataset.color ===
+                        document.querySelector(`[data-row="${row}"][data-col="${col}"]`).dataset.color);
                     
                     if (isInvalid) {
                         if (!xMarks.has(`${row},${col}`)) {
@@ -247,12 +292,22 @@ manually placed pieces.
                             xMarks.add(`${row},${col}`);
                         }
                     } else {
-                        cell.textContent = '';
-                        cell.classList.remove('x');
-                        xMarks.delete(`${row},${col}`);
+                        if (xMarks.has(`${row},${col}`)) {
+                            cell.textContent = '';
+                            cell.classList.remove('x');
+                            xMarks.delete(`${row},${col}`);
+                        }
                     }
                 }
             });
+        }
+
+        function getCellColor(row, col) {
+            return document.querySelector(`[data-row="${row}"][data-col="${col}"]`).dataset.color;
+        }
+
+        function isValidCell(x, y) {
+            return x >= 0 && x < boardSize && y >= 0 && y < boardSize;
         }
     </script>
 </body>
