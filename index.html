@@ -100,6 +100,19 @@
                 this.userEliminatedCells = new Set();
                 this.userInitiatedXCells = new Set();
                 this.crownToXMap = new Map();
+                this.colors = [
+                    '#FF0000', // Red
+                    '#00FF00', // Lime
+                    '#0000FF', // Blue
+                    '#FFFF00', // Yellow
+                    '#00FFFF', // Cyan / Aqua
+                    '#FF00FF', // Magenta / Fuchsia
+                    '#800000', // Maroon
+                    '#008000', // Green
+                    '#800080', // Purple
+                    '#008080', // Teal
+                    '#000080', // Navy
+                ];
             }
 
             _generateSolutions(maxAttempts) {
@@ -274,6 +287,13 @@
             _generateColors() {
                 // Generate main colors
                 let idx = 1;
+                let step = 1.0 / this.size;
+                let hues = [];
+                for (let i = 0; i < this.size; i++) {
+                    let hue = (i * step) + (Math.random() * 0.1);
+                    hues.push(hue);
+                }
+                hues.sort((a, b) => a - b);
                 for (let solution of this.solutions) {
                     let [i, j] = solution.split(',').map(Number);
                     let color = idx++;
@@ -480,13 +500,22 @@
             }
 
             getColor(color) {
-                let colors = [];
-                let step = 1.0 / this.size;
-                for (let i = 0; i < this.size; i++) {
-                    colors.push(this.hsvToRgb(i * step, 1, 1));
+                if (color - 1 < this.colors.length) {
+                    return this.colors[color - 1];
+                } else {
+                    let step = 1.0 / this.size;
+                    let hue = (color - 1) * step;
+                    let saturation = 1;
+                    let value = 1;
+                    if (color % 2 === 0) {
+                        saturation = 0.8;
+                        value = 0.8;
+                    } else if (color % 3 === 0) {
+                        saturation = 0.9;
+                        value = 0.7;
+                    }
+                    return this.hsvToRgb(hue, saturation, value);
                 }
-
-                return colors[color - 1] || '#FFFFFF';
             }
 
             hsvToRgb(h, s, v) {
