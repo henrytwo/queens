@@ -50,6 +50,25 @@
             align-items: center;
             z-index: 1;
         }
+
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #333;
+                color: #fff;
+            }
+            .board {
+                background-color: #444;
+            }
+            .cell {
+                border: 1px solid #666;
+            }
+            .incorrect {
+                border: 2px solid #f00;
+            }
+            .solution {
+                opacity: 0.7;
+            }
+        }
     </style>
 </head>
 <body>
