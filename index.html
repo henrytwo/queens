@@ -83,7 +83,7 @@
         <option value="19">19</option>
         <option value="20">20</option>
     </select>
-    <button id="start-button">Start</button>
+    <button id="start-button">Generate</button>
     <button id="clear-button">Clear</button>
     <span id="timer">00:00:00</span>
     <input type="checkbox" id="show-solution-button">
@@ -576,7 +576,19 @@
                 board.clear();
             }
             clearInterval(timerInterval);
-            document.getElementById('timer').innerText = '00:00:00';
+            startTime = new Date();
+            timerInterval = setInterval(() => {
+                let currentTime = new Date();
+                let elapsed = (currentTime - startTime) / 1000;
+                let hours = Math.floor(elapsed / 3600);
+                let minutes = Math.floor((elapsed % 3600) / 60);
+                let seconds = Math.floor(elapsed % 60);
+                document.getElementById('timer').innerText = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                if (board && board.checkForWin()) {
+                    clearInterval(timerInterval);
+                    document.getElementById('result').innerText = 'You won!';
+                }
+            }, 1000);
             document.getElementById('result').innerText = '';
         });
 
@@ -585,6 +597,9 @@
                 board.render();
             }
         });
+
+        document.getElementById('size-select').value = '10';
+        document.getElementById('start-button').click();
     </script>
 </body>
 </html>
