@@ -19,6 +19,7 @@
             align-items: center;
             font-size: 24px;
             border: 1px solid black;
+            position: relative;
         }
 
         #size-select {
@@ -31,6 +32,38 @@
 
         #timer {
             margin-left: 10px;
+        }
+
+        #result {
+            margin-top: 10px;
+        }
+
+        .incorrect {
+            border: 2px solid red;
+        }
+
+        .solution {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0.5;
+        }
+
+        .user-piece {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1;
         }
     </style>
 </head>
@@ -51,9 +84,11 @@
         <option value="20">20</option>
     </select>
     <button id="start-button">Start</button>
+    <button id="clear-button">Clear</button>
     <span id="timer">00:00:00</span>
     <input type="checkbox" id="show-solution-button">
     <label for="show-solution-button">Show Solution</label>
+    <div id="result"></div>
     <div class="board" id="board"></div>
     <script>
         class Board {
@@ -274,21 +309,35 @@
                         let userPlacedCrown = this.userPlacedCrowns.has(`${i},${j}`);
                         let userEliminated = this.userEliminatedCells.has(`${i},${j}`);
                         let userInitiatedX = this.userInitiatedXCells.has(`${i},${j}`);
+                        let showSolution = document.getElementById('show-solution-button').checked;
+
+                        cellElement.style.background = this.getColor(color);
+
+                        if (showSolution && solution) {
+                            let solutionElement = document.createElement('div');
+                            solutionElement.classList.add('solution');
+                            solutionElement.innerText = '👑';
+                            cellElement.appendChild(solutionElement);
+                        }
 
                         if (userInitiatedX) {
-                            cellElement.style.background = this.getColor(color);
-                            cellElement.innerText = '×';
+                            let userElement = document.createElement('div');
+                            userElement.classList.add('user-piece');
+                            userElement.innerText = '×';
+                            cellElement.appendChild(userElement);
                         } else if (userEliminated) {
-                            cellElement.style.background = this.getColor(color);
-                            cellElement.innerText = '×';
+                            let userElement = document.createElement('div');
+                            userElement.classList.add('user-piece');
+                            userElement.innerText = '×';
+                            cellElement.appendChild(userElement);
                         } else if (userPlacedCrown) {
-                            cellElement.style.background = this.getColor(color);
-                            cellElement.innerText = '👑';
-                        } else if (solution && document.getElementById('show-solution-button').checked) {
-                            cellElement.style.background = this.getColor(color);
-                            cellElement.innerText = '👑';
-                        } else {
-                            cellElement.style.background = this.getColor(color);
+                            let userElement = document.createElement('div');
+                            userElement.classList.add('user-piece');
+                            userElement.innerText = '👑';
+                            if (showSolution && !solution) {
+                                cellElement.classList.add('incorrect');
+                            }
+                            cellElement.appendChild(userElement);
                         }
 
                         cellElement.addEventListener('click', () => {
@@ -397,6 +446,19 @@
                         }
                     }
                 }
+
+                // Place X in the 8 adjacent and diagonal cells of the cell that was just selected
+                for (let [dx, dy] of [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]]) {
+                    let nx = i + dx;
+                    let ny = j + dy;
+                    if (0 <= nx && nx < this.size && 0 <= ny && ny < this.size) {
+                        this.userEliminatedCells.add(`${nx},${ny}`);
+                        if (!this.crownToXMap.has(`${i},${j}`)) {
+                            this.crownToXMap.set(`${i},${j}`, new Set());
+                        }
+                        this.crownToXMap.get(`${i},${j}`).add(`${nx},${ny}`);
+                    }
+                }
             }
 
             removeAutomaticallyPlacedX(i, j) {
@@ -476,6 +538,14 @@
 
                 return `#${Math.round(r * 255).toString(16).padStart(2, '0')}${Math.round(g * 255).toString(16).padStart(2, '0')}${Math.round(b * 255).toString(16).padStart(2, '0')}`;
             }
+
+            clear() {
+                this.userPlacedCrowns = new Set();
+                this.userEliminatedCells = new Set();
+                this.userInitiatedXCells = new Set();
+                this.crownToXMap = new Map();
+                this.render();
+            }
         }
 
         let board;
@@ -496,13 +566,24 @@
                 document.getElementById('timer').innerText = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
                 if (board.checkForWin()) {
                     clearInterval(timerInterval);
-                    alert('You won!');
+                    document.getElementById('result').innerText = 'You won!';
                 }
             }, 1000);
         });
 
+        document.getElementById('clear-button').addEventListener('click', () => {
+            if (board) {
+                board.clear();
+            }
+            clearInterval(timerInterval);
+            document.getElementById('timer').innerText = '00:00:00';
+            document.getElementById('result').innerText = '';
+        });
+
         document.getElementById('show-solution-button').addEventListener('change', () => {
-            board.render();
+            if (board) {
+                board.render();
+            }
         });
     </script>
 </body>
