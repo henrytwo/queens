@@ -10,6 +10,8 @@
         .board {
             display: grid;
             gap: 2px;
+            justify-content: center;
+            align-content: center;
         }
 
         .cell {
@@ -17,10 +19,10 @@
             justify-content: center;
             align-items: center;
             font-size: 24px;
-            border: 1px solid black;
             position: relative;
             width: 50px;
             height: 50px;
+            border: none;
         }
 
         .incorrect {
@@ -49,6 +51,7 @@
             justify-content: center;
             align-items: center;
             z-index: 1;
+            color: white;
             text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
         }
 
@@ -61,7 +64,7 @@
                 background-color: #444;
             }
             .cell {
-                border: 1px solid #666;
+                background-color: #555;
             }
             .incorrect {
                 border: 2px solid #f00;
@@ -73,36 +76,34 @@
     </style>
 </head>
 <body>
-    <div class="container mt-5">
-        <div class="row justify-content-center">
-            <div class="col-md-6 text-center">
-                <h1>Board Game</h1>
-                <span id="timer" class="ms-2" style="font-size: 36px;">00:00:00</span>
-                <div class="mt-3">
-                    <select id="size-select" class="form-select">
-                        <option value="8">8</option>
-                        <option value="9">9</option>
-                        <option value="10">10</option>
-                        <option value="11">11</option>
-                        <option value="12">12</option>
-                        <option value="13">13</option>
-                        <option value="14">14</option>
-                        <option value="15">15</option>
-                        <option value="16">16</option>
-                        <option value="17">17</option>
-                        <option value="18">18</option>
-                        <option value="19">19</option>
-                        <option value="20">20</option>
-                    </select>
-                </div>
-                <div class="mt-3">
-                    <button id="start-button" class="btn btn-primary me-2">Generate</button>
-                    <button id="clear-button" class="btn btn-secondary me-2">Clear</button>
-                    <button id="show-solution-button" class="btn btn-secondary">Show Solution</button>
-                </div>
-                <div id="result" class="mt-3"></div>
-                <div id="board" class="board mt-3" style="width: 100%;"></div>
+    <div class="container mt-5 d-flex justify-content-center">
+        <div class="col-md-6 text-center">
+            <h1>Board Game</h1>
+            <span id="timer" class="ms-2" style="font-size: 36px;">00:00:00</span>
+            <div class="mt-3">
+                <select id="size-select" class="form-select">
+                    <option value="8">8</option>
+                    <option value="9">9</option>
+                    <option value="10">10</option>
+                    <option value="11">11</option>
+                    <option value="12">12</option>
+                    <option value="13">13</option>
+                    <option value="14">14</option>
+                    <option value="15">15</option>
+                    <option value="16">16</option>
+                    <option value="17">17</option>
+                    <option value="18">18</option>
+                    <option value="19">19</option>
+                    <option value="20">20</option>
+                </select>
             </div>
+            <div class="mt-3">
+                <button id="start-button" class="btn btn-primary me-2">Generate</button>
+                <button id="clear-button" class="btn btn-secondary me-2">Clear</button>
+                <button id="show-solution-button" class="btn btn-secondary">Show Solution</button>
+            </div>
+            <div id="result" class="mt-3"></div>
+            <div id="board" class="board mt-3" style="width: 100%;"></div>
         </div>
     </div>
     <script>
@@ -125,7 +126,8 @@
 
             _generateSolutions(maxAttempts) {
                 let attempts = 0;
-                while (attempts < maxAttempts) {
+                let startTime = new Date().getTime();
+                while (attempts < maxAttempts && new Date().getTime() - startTime < 5000) {
                     let solutions = new Set();
                     let availableSolutions = new Set();
 
@@ -192,6 +194,7 @@
                     attempts++;
                 }
 
+                console.log("Failed to generate solutions after " + attempts + " attempts.");
                 return null;
             }
 
@@ -273,7 +276,7 @@
                 }
             }
 
-            _fill(color, solution, cellCount) {
+            _fillColor(color, solution, cellCount) {
                 let q = [];
 
                 q.push(solution);
@@ -293,19 +296,34 @@
             }
 
             _generateColors() {
-                let step = 1.0 / this.size;
-                let hues = [];
-                for (let i = 0; i < this.size; i++) {
-                    let hue = (i * step) + (Math.random() * 0.1);
-                    hues.push(hue);
-                }
-                hues.sort((a, b) => a - b);
+                let colors = [
+                    '#3498db', // blue
+                    '#e74c3c', // red
+                    '#2ecc71', // green
+                    '#9b59b6', // purple
+                    '#1abc9c', // teal
+                    '#16a085', // green-blue
+                    '#f1c40f', // yellow
+                    '#2c3e50', // dark blue
+                    '#95a5a6', // gray
+                    '#f39c12', // orange
+                ];
+                let usedColors = new Set();
+                let colorIndex = 0;
                 for (let solution of this.solutions) {
                     let [i, j] = solution.split(',').map(Number);
-                    let color = hues.length;
-                    let cellCount = Math.floor(Math.random() * (this.size * this.size / (this.size * 2))) + 1;
-                    this._fill(color, [i, j], cellCount);
-                    hues.pop();
+                    if (usedColors.size >= colors.length) {
+                        let hue = (usedColors.size - colors.length) / 10.0;
+                        let saturation = 0.8;
+                        let value = 0.8;
+                        let color = this.hsvToRgb(hue, saturation, value);
+                        usedColors.add(color);
+                        this._fillColor(color, [i, j], Math.floor(Math.random() * (this.size * this.size / (this.size * 2))) + 1);
+                    } else {
+                        usedColors.add(colors[colorIndex]);
+                        this._fillColor(colors[colorIndex], [i, j], Math.floor(Math.random() * (this.size * this.size / (this.size * 2))) + 1);
+                        colorIndex = (colorIndex + 1) % colors.length;
+                    }
                 }
                 this._fillHoles();
             }
@@ -320,17 +338,15 @@
                     for (let j = 0; j < this.size; j++) {
                         let cellElement = document.createElement('div');
                         cellElement.classList.add('cell');
+                        cellElement.style.background = this.board[i][j];
                         cellElement.dataset.row = i;
                         cellElement.dataset.col = j;
 
-                        let color = this.board[i][j];
                         let solution = this.solutions.has(`${i},${j}`);
                         let userPlacedCrown = this.userPlacedCrowns.has(`${i},${j}`);
                         let userInitiatedX = this.userInitiatedXCells.has(`${i},${j}`);
                         let userEliminated = this.userEliminatedCells.has(`${i},${j}`);
                         let showSolution = document.getElementById('show-solution-button').innerText === 'Hide Solution';
-
-                        cellElement.style.background = this.getColor(color);
 
                         if (showSolution && solution) {
                             let solutionElement = document.createElement('div');
@@ -342,19 +358,16 @@
                         if (userInitiatedX) {
                             let userElement = document.createElement('div');
                             userElement.classList.add('user-piece');
-                            userElement.style.color = this.getInvertedColor(cellElement.style.background);
                             userElement.innerText = '×';
                             cellElement.appendChild(userElement);
                         } else if (userEliminated) {
                             let userElement = document.createElement('div');
                             userElement.classList.add('user-piece');
-                            userElement.style.color = this.getInvertedColor(cellElement.style.background);
                             userElement.innerText = '×';
                             cellElement.appendChild(userElement);
                         } else if (userPlacedCrown) {
                             let userElement = document.createElement('div');
                             userElement.classList.add('user-piece');
-                            userElement.style.color = this.getInvertedColor(cellElement.style.background);
                             userElement.innerText = '👑';
                             if (showSolution && !solution) {
                                 cellElement.classList.add('incorrect');
@@ -391,7 +404,7 @@
                     if (cellElement) {
                         cellElement.style.backgroundColor = '#ff0000';
                         setTimeout(() => {
-                            cellElement.style.backgroundColor = '';
+                            cellElement.style.backgroundColor = this.board[i][j];
                         }, 1000);
                     }
                 }
@@ -520,21 +533,6 @@
                     return true;
                 }
                 return false;
-            }
-
-            getColor(color) {
-                let step = 1.0 / this.size;
-                let hue = (color - 1) * step;
-                let saturation = 1;
-                let value = 1;
-                if (color % 2 === 0) {
-                    saturation = 0.8;
-                    value = 0.8;
-                } else if (color % 3 === 0) {
-                    saturation = 0.9;
-                    value = 0.7;
-                }
-                return this.hsvToRgb(hue, saturation, value);
             }
 
             getInvertedColor(color) {
