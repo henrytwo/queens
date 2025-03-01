@@ -119,6 +119,7 @@
                 this.userEliminatedCells = new Set();
                 this.userInitiatedXCells = new Set();
                 this.crownToXMap = new Map();
+                this.xToCrownsMap = new Map();
             }
 
             _generateSolutions(maxAttempts) {
@@ -291,8 +292,6 @@
             }
 
             _generateColors() {
-                // Generate main colors
-                let idx = 1;
                 let step = 1.0 / this.size;
                 let hues = [];
                 for (let i = 0; i < this.size; i++) {
@@ -302,13 +301,11 @@
                 hues.sort((a, b) => a - b);
                 for (let solution of this.solutions) {
                     let [i, j] = solution.split(',').map(Number);
-                    let color = idx++;
+                    let color = hues.length;
                     let cellCount = Math.floor(Math.random() * (this.size * this.size / (this.size * 2))) + 1;
-
                     this._fill(color, [i, j], cellCount);
+                    hues.pop();
                 }
-
-                // Fill in any remaining holes with nearest adjacent color
                 this._fillHoles();
             }
 
@@ -328,8 +325,8 @@
                         let color = this.board[i][j];
                         let solution = this.solutions.has(`${i},${j}`);
                         let userPlacedCrown = this.userPlacedCrowns.has(`${i},${j}`);
-                        let userEliminated = this.userEliminatedCells.has(`${i},${j}`);
                         let userInitiatedX = this.userInitiatedXCells.has(`${i},${j}`);
+                        let userEliminated = this.userEliminatedCells.has(`${i},${j}`);
                         let showSolution = document.getElementById('show-solution-button').innerText === 'Hide Solution';
 
                         cellElement.style.background = this.getColor(color);
@@ -367,6 +364,7 @@
                         cellElement.addEventListener('click', () => {
                             if (this.userInitiatedXCells.has(`${i},${j}`)) {
                                 this.userInitiatedXCells.delete(`${i},${j}`);
+                                // After removing X, attempt to place crown
                                 this.placeCrown(i, j);
                             } else if (this.userPlacedCrowns.has(`${i},${j}`)) {
                                 this.userPlacedCrowns.delete(`${i},${j}`);
@@ -390,29 +388,28 @@
                     this.placeAutomaticallyX(i, j);
                 } else {
                     let cellElement = document.querySelector(`[data-row="${i}"][data-col="${j}"]`);
-                    cellElement.style.color = 'red';
-                    setTimeout(() => {
-                        cellElement.style.color = '';
-                    }, 1000);
+                    if (cellElement) {
+                        cellElement.style.backgroundColor = '#ff0000';
+                        setTimeout(() => {
+                            cellElement.style.backgroundColor = '';
+                        }, 1000);
+                    }
                 }
             }
 
             isValidCrownPlacement(i, j) {
-                // Check if there is already a crown in the same row
                 for (let x = 0; x < this.size; x++) {
                     if (x !== i && this.userPlacedCrowns.has(`${x},${j}`)) {
                         return false;
                     }
                 }
 
-                // Check if there is already a crown in the same column
                 for (let y = 0; y < this.size; y++) {
                     if (y !== j && this.userPlacedCrowns.has(`${i},${y}`)) {
                         return false;
                     }
                 }
 
-                // Check if there is already a crown in the same color region
                 let color = this.board[i][j];
                 for (let x = 0; x < this.size; x++) {
                     for (let y = 0; y < this.size; y++) {
@@ -422,7 +419,6 @@
                     }
                 }
 
-                // Check if the crown is adjacent to another crown
                 for (let [dx, dy] of [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]]) {
                     let nx = i + dx;
                     let ny = j + dy;
@@ -435,77 +431,80 @@
             }
 
             placeAutomaticallyX(i, j) {
-                // Place X in the same row
+                let xPositions = new Set();
+
+                // Same row
                 for (let x = 0; x < this.size; x++) {
                     if (x !== i) {
-                        this.userEliminatedCells.add(`${x},${j}`);
-                        if (!this.crownToXMap.has(`${i},${j}`)) {
-                            this.crownToXMap.set(`${i},${j}`, new Set());
-                        }
-                        this.crownToXMap.get(`${i},${j}`).add(`${x},${j}`);
+                        xPositions.add(`${x},${j}`);
                     }
                 }
 
-                // Place X in the same column
+                // Same column
                 for (let y = 0; y < this.size; y++) {
                     if (y !== j) {
-                        this.userEliminatedCells.add(`${i},${y}`);
-                        if (!this.crownToXMap.has(`${i},${j}`)) {
-                            this.crownToXMap.set(`${i},${j}`, new Set());
-                        }
-                        this.crownToXMap.get(`${i},${j}`).add(`${i},${y}`);
+                        xPositions.add(`${i},${y}`);
                     }
                 }
 
-                // Place X in the same color region
+                // Same color region
                 let color = this.board[i][j];
                 for (let x = 0; x < this.size; x++) {
                     for (let y = 0; y < this.size; y++) {
                         if ((x !== i || y !== j) && this.board[x][y] === color) {
-                            this.userEliminatedCells.add(`${x},${y}`);
-                            if (!this.crownToXMap.has(`${i},${j}`)) {
-                                this.crownToXMap.set(`${i},${j}`, new Set());
-                            }
-                            this.crownToXMap.get(`${i},${j}`).add(`${x},${y}`);
+                            xPositions.add(`${x},${y}`);
                         }
                     }
                 }
 
-                // Place X in the 8 adjacent and diagonal cells of the cell that was just selected
+                // Adjacent cells
                 for (let [dx, dy] of [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]]) {
                     let nx = i + dx;
                     let ny = j + dy;
                     if (0 <= nx && nx < this.size && 0 <= ny && ny < this.size) {
-                        this.userEliminatedCells.add(`${nx},${ny}`);
-                        if (!this.crownToXMap.has(`${i},${j}`)) {
-                            this.crownToXMap.set(`${i},${j}`, new Set());
-                        }
-                        this.crownToXMap.get(`${i},${j}`).add(`${nx},${ny}`);
+                        xPositions.add(`${nx},${ny}`);
+                    }
+                }
+
+                if (!this.crownToXMap.has(`${i},${j}`)) {
+                    this.crownToXMap.set(`${i},${j}`, new Set());
+                }
+
+                for (let pos of xPositions) {
+                    this.crownToXMap.get(`${i},${j}`).add(pos);
+                    if (!this.xToCrownsMap.has(pos)) {
+                        this.xToCrownsMap.set(pos, new Set());
+                    }
+                    this.xToCrownsMap.get(pos).add(`${i},${j}`);
+                    if (!this.userEliminatedCells.has(pos)) {
+                        this.userEliminatedCells.add(pos);
                     }
                 }
             }
 
             removeAutomaticallyPlacedX(i, j) {
                 if (this.crownToXMap.has(`${i},${j}`)) {
-                    for (let x of this.crownToXMap.get(`${i},${j}`)) {
-                        this.userEliminatedCells.delete(x);
+                    let xPositions = this.crownToXMap.get(`${i},${j}`);
+                    for (let pos of xPositions) {
+                        if (this.xToCrownsMap.has(pos)) {
+                            this.xToCrownsMap.get(pos).delete(`${i},${j}`);
+                            if (this.xToCrownsMap.get(pos).size === 0) {
+                                this.xToCrownsMap.delete(pos);
+                                this.userEliminatedCells.delete(pos);
+                            }
+                        }
                     }
                     this.crownToXMap.delete(`${i},${j}`);
                 }
-                this.revalidateEliminatedCells();
+                this.render();
             }
 
-            revalidateEliminatedCells() {
-                let newEliminatedCells = new Set();
-                for (let [i, j] of this.crownToXMap.keys()) {
-                    for (let x of this.crownToXMap.get(`${i},${j}`)) {
-                        newEliminatedCells.add(x);
-                    }
-                }
-                for (let [i, j] of this.userInitiatedXCells) {
-                    newEliminatedCells.add(`${i},${j}`);
-                }
-                this.userEliminatedCells = newEliminatedCells;
+            clear() {
+                this.userPlacedCrowns = new Set();
+                this.userEliminatedCells = new Set();
+                this.userInitiatedXCells = new Set();
+                this.crownToXMap = new Map();
+                this.xToCrownsMap = new Map();
                 this.render();
             }
 
@@ -588,14 +587,6 @@
                 }
 
                 return `#${Math.round(r * 255).toString(16).padStart(2, '0')}${Math.round(g * 255).toString(16).padStart(2, '0')}${Math.round(b * 255).toString(16).padStart(2, '0')}`;
-            }
-
-            clear() {
-                this.userPlacedCrowns = new Set();
-                this.userEliminatedCells = new Set();
-                this.userInitiatedXCells = new Set();
-                this.crownToXMap = new Map();
-                this.render();
             }
         }
 
