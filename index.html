@@ -20,9 +20,40 @@
             font-size: 24px;
             border: 1px solid black;
         }
+
+        #size-select {
+            width: 50px;
+        }
+
+        #start-button {
+            margin-left: 10px;
+        }
+
+        #timer {
+            margin-left: 10px;
+        }
     </style>
 </head>
 <body>
+    <select id="size-select">
+        <option value="8">8</option>
+        <option value="9">9</option>
+        <option value="10">10</option>
+        <option value="11">11</option>
+        <option value="12">12</option>
+        <option value="13">13</option>
+        <option value="14">14</option>
+        <option value="15">15</option>
+        <option value="16">16</option>
+        <option value="17">17</option>
+        <option value="18">18</option>
+        <option value="19">19</option>
+        <option value="20">20</option>
+    </select>
+    <button id="start-button">Start</button>
+    <span id="timer">00:00:00</span>
+    <input type="checkbox" id="show-solution-button">
+    <label for="show-solution-button">Show Solution</label>
     <div class="board" id="board"></div>
     <script>
         class Board {
@@ -35,6 +66,10 @@
                 } else {
                     console.log("Failed to generate solutions after 1000 attempts.");
                 }
+                this.userPlacedCrowns = new Set();
+                this.userEliminatedCells = new Set();
+                this.userInitiatedXCells = new Set();
+                this.crownToXMap = new Map();
             }
 
             _generateSolutions(maxAttempts) {
@@ -231,20 +266,160 @@
                     for (let j = 0; j < this.size; j++) {
                         let cellElement = document.createElement('div');
                         cellElement.classList.add('cell');
+                        cellElement.dataset.row = i;
+                        cellElement.dataset.col = j;
 
                         let color = this.board[i][j];
                         let solution = this.solutions.has(`${i},${j}`);
+                        let userPlacedCrown = this.userPlacedCrowns.has(`${i},${j}`);
+                        let userEliminated = this.userEliminatedCells.has(`${i},${j}`);
+                        let userInitiatedX = this.userInitiatedXCells.has(`${i},${j}`);
 
-                        if (solution) {
+                        if (userInitiatedX) {
+                            cellElement.style.background = this.getColor(color);
+                            cellElement.innerText = '×';
+                        } else if (userEliminated) {
+                            cellElement.style.background = this.getColor(color);
+                            cellElement.innerText = '×';
+                        } else if (userPlacedCrown) {
+                            cellElement.style.background = this.getColor(color);
+                            cellElement.innerText = '👑';
+                        } else if (solution && document.getElementById('show-solution-button').checked) {
                             cellElement.style.background = this.getColor(color);
                             cellElement.innerText = '👑';
                         } else {
                             cellElement.style.background = this.getColor(color);
                         }
 
+                        cellElement.addEventListener('click', () => {
+                            if (this.userInitiatedXCells.has(`${i},${j}`)) {
+                                this.userInitiatedXCells.delete(`${i},${j}`);
+                                this.placeCrown(i, j);
+                            } else if (this.userPlacedCrowns.has(`${i},${j}`)) {
+                                this.userPlacedCrowns.delete(`${i},${j}`);
+                                this.removeAutomaticallyPlacedX(i, j);
+                            } else if (this.userEliminatedCells.has(`${i},${j}`)) {
+                                // Do nothing
+                            } else {
+                                this.userInitiatedXCells.add(`${i},${j}`);
+                            }
+                            this.render();
+                        });
+
                         boardElement.appendChild(cellElement);
                     }
                 }
+            }
+
+            placeCrown(i, j) {
+                if (this.isValidCrownPlacement(i, j)) {
+                    this.userPlacedCrowns.add(`${i},${j}`);
+                    this.placeAutomaticallyX(i, j);
+                } else {
+                    let cellElement = document.querySelector(`[data-row="${i}"][data-col="${j}"]`);
+                    cellElement.style.color = 'red';
+                    setTimeout(() => {
+                        cellElement.style.color = '';
+                    }, 1000);
+                }
+            }
+
+            isValidCrownPlacement(i, j) {
+                // Check if there is already a crown in the same row
+                for (let x = 0; x < this.size; x++) {
+                    if (x !== i && this.userPlacedCrowns.has(`${x},${j}`)) {
+                        return false;
+                    }
+                }
+
+                // Check if there is already a crown in the same column
+                for (let y = 0; y < this.size; y++) {
+                    if (y !== j && this.userPlacedCrowns.has(`${i},${y}`)) {
+                        return false;
+                    }
+                }
+
+                // Check if there is already a crown in the same color region
+                let color = this.board[i][j];
+                for (let x = 0; x < this.size; x++) {
+                    for (let y = 0; y < this.size; y++) {
+                        if ((x !== i || y !== j) && this.board[x][y] === color && this.userPlacedCrowns.has(`${x},${y}`)) {
+                            return false;
+                        }
+                    }
+                }
+
+                // Check if the crown is adjacent to another crown
+                for (let [dx, dy] of [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]]) {
+                    let nx = i + dx;
+                    let ny = j + dy;
+                    if (0 <= nx && nx < this.size && 0 <= ny && ny < this.size && this.userPlacedCrowns.has(`${nx},${ny}`)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
+            placeAutomaticallyX(i, j) {
+                // Place X in the same row
+                for (let x = 0; x < this.size; x++) {
+                    if (x !== i) {
+                        this.userEliminatedCells.add(`${x},${j}`);
+                        if (!this.crownToXMap.has(`${i},${j}`)) {
+                            this.crownToXMap.set(`${i},${j}`, new Set());
+                        }
+                        this.crownToXMap.get(`${i},${j}`).add(`${x},${j}`);
+                    }
+                }
+
+                // Place X in the same column
+                for (let y = 0; y < this.size; y++) {
+                    if (y !== j) {
+                        this.userEliminatedCells.add(`${i},${y}`);
+                        if (!this.crownToXMap.has(`${i},${j}`)) {
+                            this.crownToXMap.set(`${i},${j}`, new Set());
+                        }
+                        this.crownToXMap.get(`${i},${j}`).add(`${i},${y}`);
+                    }
+                }
+
+                // Place X in the same color region
+                let color = this.board[i][j];
+                for (let x = 0; x < this.size; x++) {
+                    for (let y = 0; y < this.size; y++) {
+                        if ((x !== i || y !== j) && this.board[x][y] === color) {
+                            this.userEliminatedCells.add(`${x},${y}`);
+                            if (!this.crownToXMap.has(`${i},${j}`)) {
+                                this.crownToXMap.set(`${i},${j}`, new Set());
+                            }
+                            this.crownToXMap.get(`${i},${j}`).add(`${x},${y}`);
+                        }
+                    }
+                }
+            }
+
+            removeAutomaticallyPlacedX(i, j) {
+                if (this.crownToXMap.has(`${i},${j}`)) {
+                    for (let x of this.crownToXMap.get(`${i},${j}`)) {
+                        this.userEliminatedCells.delete(x);
+                    }
+                    this.crownToXMap.delete(`${i},${j}`);
+                }
+            }
+
+            checkForWin() {
+                if (this.userPlacedCrowns.size === this.size) {
+                    for (let i = 0; i < this.size; i++) {
+                        for (let j = 0; j < this.size; j++) {
+                            if (this.userPlacedCrowns.has(`${i},${j}`) && !this.solutions.has(`${i},${j}`)) {
+                                return false;
+                            }
+                        }
+                    }
+                    return true;
+                }
+                return false;
             }
 
             getColor(color) {
@@ -303,12 +478,32 @@
             }
         }
 
-        let board = new Board(8);
-        if (board.solutions !== null) {
+        let board;
+        let timerInterval;
+        let startTime;
+
+        document.getElementById('start-button').addEventListener('click', () => {
+            let size = parseInt(document.getElementById('size-select').value);
+            board = new Board(size);
             board.render();
-        } else {
-            console.log("Failed to generate solutions after 1000 attempts.");
-        }
+            startTime = new Date();
+            timerInterval = setInterval(() => {
+                let currentTime = new Date();
+                let elapsed = (currentTime - startTime) / 1000;
+                let hours = Math.floor(elapsed / 3600);
+                let minutes = Math.floor((elapsed % 3600) / 60);
+                let seconds = Math.floor(elapsed % 60);
+                document.getElementById('timer').innerText = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                if (board.checkForWin()) {
+                    clearInterval(timerInterval);
+                    alert('You won!');
+                }
+            }, 1000);
+        });
+
+        document.getElementById('show-solution-button').addEventListener('change', () => {
+            board.render();
+        });
     </script>
 </body>
 </html>

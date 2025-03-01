@@ -13,3 +13,17 @@ You must also verify that the generated board satisfies the parameters specified
 If a piece is placed down, mark any cells that should be eliminated with an X, but these must be removed if that piece is removed. Do not remove
 manually placed pieces.
 -->
+
+Great, now I want these UI changes:
+1. do not initially show the solutions. Add a toggle that says "show solution" that will reveal the crowns
+2. If a user clicks on a cell, mark it with an "X" to allow the user to mentally elminate a cell. If they click on the same cell again, they are attempting to place a crown there.
+3. Placing down a crown must comply with these rules:
+- exactly one piece in each row
+- exactly one piece in each col
+- exactly one piece in each color region
+- colored cells must be connected to each other
+- pieces cannot be adjacent to each other (side by side or diagonal)
+4. If it is in violation, you should display the crown in red
+5. when a crown is placed down, mark any cells that are eliminated as a result of these rules with an X. If the user removes that crown, any automatically placed X must be removed
+
+When the page loads, allow the user to select size of the board in a dropdown from 1-20, and a start button. Start a timer when the user hits start and display it. If the user finds a solution satisfying the rules, stop the timer and freeze the board
