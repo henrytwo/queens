@@ -53,6 +53,26 @@
             z-index: 1;
             color: white;
             text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+            font-size: 28px;
+        }
+
+        .dots {
+            position: absolute;
+            bottom: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: row;
+            gap: 2px;
+            z-index: 0;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            opacity: 0.8;
+            border: 1px solid white;
         }
 
         @media (prefers-color-scheme: dark) {
@@ -122,6 +142,7 @@
                 this.userInitiatedXCells = new Set();
                 this.crownToXMap = new Map();
                 this.xToCrownsMap = new Map();
+                this.xColors = new Map(); // Stores color information for X cells
             }
 
             _generateSolutions(maxAttempts) {
@@ -363,6 +384,18 @@
                             userElement.classList.add('user-piece');
                             userElement.innerText = '×';
                             cellElement.appendChild(userElement);
+
+                            // Add color dots for all affecting colors
+                            let colors = this.xColors.get(`${i},${j}`) || new Set();
+                            let dotsElement = document.createElement('div');
+                            dotsElement.classList.add('dots');
+                            Array.from(colors).forEach(color => {
+                                let dot = document.createElement('div');
+                                dot.classList.add('dot');
+                                dot.style.backgroundColor = color;
+                                dotsElement.appendChild(dot);
+                            });
+                            cellElement.appendChild(dotsElement);
                         } else if (userPlacedCrown) {
                             let userElement = document.createElement('div');
                             userElement.classList.add('user-piece');
@@ -487,6 +520,14 @@
                         this.xToCrownsMap.set(pos, new Set());
                     }
                     this.xToCrownsMap.get(pos).add(`${i},${j}`);
+                    
+                    // Add the crown's color to the X cell's color set
+                    let crownColor = this.board[i][j];
+                    if (!this.xColors.has(pos)) {
+                        this.xColors.set(pos, new Set());
+                    }
+                    this.xColors.get(pos).add(crownColor);
+                    
                     if (!this.userEliminatedCells.has(pos)) {
                         this.userEliminatedCells.add(pos);
                     }
@@ -502,6 +543,15 @@
                             if (this.xToCrownsMap.get(pos).size === 0) {
                                 this.xToCrownsMap.delete(pos);
                                 this.userEliminatedCells.delete(pos);
+                                
+                                // Remove the crown's color from the X cell's color set
+                                let colors = this.xColors.get(pos);
+                                if (colors) {
+                                    colors.delete(this.board[i][j]);
+                                    if (colors.size === 0) {
+                                        this.xColors.delete(pos);
+                                    }
+                                }
                             }
                         }
                     }
@@ -516,6 +566,7 @@
                 this.userInitiatedXCells = new Set();
                 this.crownToXMap = new Map();
                 this.xToCrownsMap = new Map();
+                this.xColors = new Map();
                 this.render();
             }
 
