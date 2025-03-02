@@ -148,7 +148,8 @@
                 this.crownToXMap = new Map();
                 this.xToCrownsMap = new Map();
                 this.xColors = new Map();
-                this.ambiguousCells = new Set(); // Track cells with exactly two colors
+                this.ambiguousCells = new Set();
+                this.colorPairs = new Map();
             }
 
             _generateSolutions(maxAttempts) {
@@ -359,9 +360,24 @@
 
                 // Identify ambiguous cells (exactly two colors)
                 this.ambiguousCells.clear();
+                this.colorPairs.clear();
+
+                // First pass: Identify all color pairs
                 for (let [pos, colors] of this.xColors) {
                     if (colors.size === 2) {
-                        this.ambiguousCells.add(pos);
+                        let colorArray = Array.from(colors);
+                        let colorPair = colorArray.sort().join(',');
+                        if (!this.colorPairs.has(colorPair)) {
+                            this.colorPairs.set(colorPair, new Set());
+                        }
+                        this.colorPairs.get(colorPair).add(pos);
+                    }
+                }
+
+                // Second pass: Mark cells as ambiguous if their color pair exists elsewhere
+                for (let [colorPair, positions] of this.colorPairs) {
+                    if (positions.size >= 2) {
+                        positions.forEach(pos => this.ambiguousCells.add(pos));
                     }
                 }
 
@@ -560,6 +576,8 @@
                             if (this.xToCrownsMap.get(pos).size === 0) {
                                 this.xToCrownsMap.delete(pos);
                                 this.userEliminatedCells.delete(pos);
+                                // Update colorPairs when a crown is removed
+                                this.colorPairs.delete(pos);
                             }
                         }
                         // Remove the crown's color from the X cell's color set
@@ -584,6 +602,7 @@
                 this.xToCrownsMap = new Map();
                 this.xColors = new Map();
                 this.ambiguousCells = new Set();
+                this.colorPairs = new Map();
                 this.render();
             }
 
