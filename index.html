@@ -75,6 +75,11 @@
             border: 1px solid white;
         }
 
+        .highlight {
+            border: 2px solid yellow;
+            box-shadow: 0 0 5px yellow;
+        }
+
         @media (prefers-color-scheme: dark) {
             body {
                 background-color: #333;
@@ -142,7 +147,8 @@
                 this.userInitiatedXCells = new Set();
                 this.crownToXMap = new Map();
                 this.xToCrownsMap = new Map();
-                this.xColors = new Map(); // Stores color information for X cells
+                this.xColors = new Map();
+                this.ambiguousCells = new Set(); // Track cells with exactly two colors
             }
 
             _generateSolutions(maxAttempts) {
@@ -158,9 +164,7 @@
                         }
                     }
 
-                    let self = this;
-
-                    function _selectCoordinate() {
+                    const selectCoordinate = (availableSolutions, board) => {
                         if (availableSolutions.size === 0) {
                             return null;
                         }
@@ -182,24 +186,24 @@
                         }
 
                         // Remove everything in the same row.
-                        for (let nj = 0; nj < self.size; nj++) {
+                        for (let nj = 0; nj < board.size; nj++) {
                             if (availableSolutions.has(`${i},${nj}`)) {
                                 availableSolutions.delete(`${i},${nj}`);
                             }
                         }
 
                         // Remove everything in the same column.
-                        for (let ni = 0; ni < self.size; ni++) {
+                        for (let ni = 0; ni < board.size; ni++) {
                             if (availableSolutions.has(`${ni},${j}`)) {
                                 availableSolutions.delete(`${ni},${j}`);
                             }
                         }
 
                         return [i, j];
-                    }
+                    };
 
                     for (let _ = 0; _ < this.size; _++) {
-                        let solution = _selectCoordinate();
+                        let solution = selectCoordinate(availableSolutions, this);
 
                         if (solution) {
                             solutions.add(solution.join(','));
@@ -353,6 +357,14 @@
                 boardElement.style.gridTemplateColumns = `repeat(${this.size}, 50px)`;
                 boardElement.style.gridTemplateRows = `repeat(${this.size}, 50px)`;
 
+                // Identify ambiguous cells (exactly two colors)
+                this.ambiguousCells.clear();
+                for (let [pos, colors] of this.xColors) {
+                    if (colors.size === 2) {
+                        this.ambiguousCells.add(pos);
+                    }
+                }
+
                 for (let i = 0; i < this.size; i++) {
                     for (let j = 0; j < this.size; j++) {
                         let cellElement = document.createElement('div');
@@ -360,6 +372,11 @@
                         cellElement.style.background = this.board[i][j];
                         cellElement.dataset.row = i;
                         cellElement.dataset.col = j;
+
+                        // Check if cell is ambiguous
+                        if (this.ambiguousCells.has(`${i},${j}`)) {
+                            cellElement.classList.add('highlight');
+                        }
 
                         let solution = this.solutions.has(`${i},${j}`);
                         let userPlacedCrown = this.userPlacedCrowns.has(`${i},${j}`);
@@ -566,6 +583,7 @@
                 this.crownToXMap = new Map();
                 this.xToCrownsMap = new Map();
                 this.xColors = new Map();
+                this.ambiguousCells = new Set();
                 this.render();
             }
 
