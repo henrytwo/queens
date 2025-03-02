@@ -543,15 +543,14 @@
                             if (this.xToCrownsMap.get(pos).size === 0) {
                                 this.xToCrownsMap.delete(pos);
                                 this.userEliminatedCells.delete(pos);
-                                
-                                // Remove the crown's color from the X cell's color set
-                                let colors = this.xColors.get(pos);
-                                if (colors) {
-                                    colors.delete(this.board[i][j]);
-                                    if (colors.size === 0) {
-                                        this.xColors.delete(pos);
-                                    }
-                                }
+                            }
+                        }
+                        // Remove the crown's color from the X cell's color set
+                        let colors = this.xColors.get(pos);
+                        if (colors) {
+                            colors.delete(this.board[i][j]);
+                            if (colors.size === 0) {
+                                this.xColors.delete(pos);
                             }
                         }
                     }
